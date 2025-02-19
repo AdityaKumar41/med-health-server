@@ -26,6 +26,7 @@ model Patient {
   appointments    Appointment[]
   prescriptions   Prescription[]
   reports         Report[]
+  ratings         Rating[]       // Add this line
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -34,13 +35,16 @@ model Doctor {
   id              String         @id @default(cuid())
   name            String
   email           String
-  speciality      String
+  speciality      String         // Keep this for backwards compatibility
   age             Int
   wallet_address  String         @unique
   profile_picture String?
   appointments    Appointment[]
   prescriptions   Prescription[]
   reports         Report[]
+  ratings         Rating[]
+  average_rating  Float?
+  specialties     DoctorSpecialty[]  // Add this line
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -60,6 +64,7 @@ model Appointment {
   contract_appointment_id Int?     // Appointment ID from the smart contract
   is_active         Boolean        @default(true)
   amount_paid       Float          
+  rating            Rating?        // Add this line
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 }
@@ -88,4 +93,46 @@ model Report {
   report         String
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+}
+
+model Rating {
+  id             String      @id @default(cuid())
+  rating         Int         @default(0)  
+  comment        String?
+  patient_id     String
+  doctor_id      String
+  appointment_id String      @unique     // One rating per appointment
+  patient        Patient     @relation(fields: [patient_id], references: [id])
+  doctor         Doctor      @relation(fields: [doctor_id], references: [id])
+  appointment    Appointment @relation(fields: [appointment_id], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([doctor_id])
+  @@index([patient_id])
+}
+
+model Specialty {
+  id          String            @id @default(cuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  icon        String?          // URL or icon name
+  doctors     DoctorSpecialty[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model DoctorSpecialty {
+  id           String    @id @default(cuid())
+  doctor_id    String
+  specialty_id String
+  doctor       Doctor    @relation(fields: [doctor_id], references: [id])
+  specialty    Specialty @relation(fields: [specialty_id], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now())
+
+  @@unique([doctor_id, specialty_id])
+  @@index([doctor_id])
+  @@index([specialty_id])
 }
