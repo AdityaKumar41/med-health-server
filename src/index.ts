@@ -2,8 +2,8 @@ import express from "express";
 import appRouter from "./routes/v1/app";
 import patientRouter from "./routes/v1/patient";
 import cors from "cors";
-import { authMiddleware } from "./middleware/auth";
 import { startChatServer } from "./chatServer";
+import doctorRouter from "./routes/v1/doctor";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +15,7 @@ app.use(express.json());
 
 app.use("/v1", appRouter);
 app.use("/v1", patientRouter);
+app.use("/v1", doctorRouter)
 
 // Start the main API server
 app.listen(PORT, () => {
