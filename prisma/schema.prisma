@@ -33,12 +33,20 @@ model Patient {
 
 model Doctor {
   id              String         @id @default(cuid())
+  doctor_id       String         @unique
   name            String
   email           String
-  speciality      String         // Keep this for backwards compatibility
   age             Int
   wallet_address  String         @unique
   profile_picture String?
+  hospital        String
+  experience      Int
+  qualification   String
+  bio             String
+  location_lat    Float
+  location_lng    Float
+  available_days  String[]
+  available_time  AvailableTime[]
   appointments    Appointment[]
   prescriptions   Prescription[]
   reports         Report[]
@@ -135,4 +143,16 @@ model DoctorSpecialty {
   @@unique([doctor_id, specialty_id])
   @@index([doctor_id])
   @@index([specialty_id])
+}
+
+model AvailableTime {
+  id          String   @id @default(cuid())
+  doctor_id   String
+  doctor      Doctor   @relation(fields: [doctor_id], references: [id])
+  start_time  String
+  end_time    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@index([doctor_id])
 }
