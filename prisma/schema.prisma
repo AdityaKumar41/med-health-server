@@ -73,6 +73,7 @@ model Appointment {
   is_active         Boolean        @default(true)
   amount_paid       Float          
   rating            Rating?        // Add this line
+  ticket            Ticket?        // Relation to the ticket
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 }
@@ -87,7 +88,7 @@ model Prescription {
   appointment    Appointment @relation(fields: [appointment_id], references: [id])
   prescription   String
   createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  updatedAt      DateTime    @default(now())
 }
 
 model Report {
@@ -100,7 +101,7 @@ model Report {
   appointment    Appointment @relation(fields: [appointment_id], references: [id])
   report         String
   createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  updatedAt      DateTime    @default(now())
 }
 
 model Rating {
@@ -114,7 +115,7 @@ model Rating {
   doctor         Doctor      @relation(fields: [doctor_id], references: [id])
   appointment    Appointment @relation(fields: [appointment_id], references: [id])
   createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  updatedAt      DateTime    @default(now())
 
   @@index([doctor_id])
   @@index([patient_id])
@@ -155,4 +156,21 @@ model AvailableTime {
   updatedAt   DateTime @default(now())
 
   @@index([doctor_id])
+}
+
+// Add Ticket model
+model Ticket {
+  id              String      @id @default(cuid())
+  ticket_number   String      @unique // Formatted ticket number (e.g., TCK-20240520-001)
+  appointment_id  String      @unique // One ticket per appointment
+  appointment     Appointment @relation(fields: [appointment_id], references: [id])
+  status          String      @default("active") // active, resolved, cancelled
+  notes           String?     // Optional notes about the ticket
+  qr_code         String?     // URL to QR code image
+  expires_at      DateTime    // New field: when the ticket expires
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([ticket_number])
+  @@index([appointment_id])
 }

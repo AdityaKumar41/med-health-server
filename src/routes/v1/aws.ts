@@ -14,7 +14,7 @@ const s3Client = new S3Client({
 })
 
 
-awsRouter.get("/getSignedUrl", async (req: Request, res: Response) => {
+awsRouter.post("/signedurl", async (req: Request, res: Response) => {
 
     const auth = req.headers.authorization?.split(" ")[1];
     if (!auth) {
@@ -33,17 +33,23 @@ awsRouter.get("/getSignedUrl", async (req: Request, res: Response) => {
         return;
     }
 
+    console.log(parsedBody.data)
+
     try {
         // create put object command
         const command = new PutObjectCommand({
-            Bucket: process.env.AWS_BUCKET_NAME!,
-            Key: `uploads/${parsedBody.data.filename}-${Date.now().toString()}/${auth}.${parsedBody.data.filetype.split("/")[1]}`,
+            Bucket: process.env.S3_BUCKET_NAME!,
+            Key: `upload/${auth}/${Date.now()}.${parsedBody.data.filetype.split("/")[1]}`,
         });
 
+        console.log("command", command)
 
-        const signedUrl = getSignedUrl(s3Client, command, {
+
+        const signedUrl = await getSignedUrl(s3Client, command, {
             expiresIn: 300 // 5 minutes
         })
+
+        console.log("signedUrl", signedUrl)
 
 
         res.status(200).json({

@@ -7,17 +7,34 @@ export const PatientSchema = z.object({
     gender: z.string().nonempty(),
     blood_group: z.string(),
     wallet_address: z.string().nonempty(),
+    profile_picture: z.string().optional(),
 });
 
 export const DoctorSchema = z.object({
-    name: z.string().nonempty()
-})
+    name: z.string().nonempty(),
+    email: z.string().nonempty(),
+    age: z.number().int().positive(),
+    doctor_id: z.string().nonempty(),
+    wallet_address: z.string().nonempty(),
+    profile_picture: z.string().optional(),
+    hospital: z.string().nonempty(),
+    experience: z.number().int().positive(),
+    qualification: z.string().nonempty(),
+    bio: z.string().nonempty(),
+    location_lat: z.number(),
+    location_lng: z.number(),
+    available_days: z.array(z.string().nonempty()),
+    specialties: z.array(z.string().nonempty()),
+    average_rating: z.number().optional(),
+});
 
 // update patient details schema
 export const UpdatePatientSchema = z.object({
     name: z.string().nonempty().optional(),
     email: z.string().nonempty().optional(),
-    age: z.number().int().positive(),
+    age: z.number().int().positive().optional(),
+    gender: z.string().nonempty().optional(),
+    blood_group: z.string().optional(),
     profile_picture: z.string().nonempty().optional()
 });
 
@@ -35,7 +52,6 @@ export const RegisterDoctorSchema = z.object({
     specialties: z.array(z.string().nonempty()),
     profile_picture: z.string().nonempty(),
     wallet_address: z.string().nonempty(),
-    verified: z.boolean(),
     locationwork: z.object({
         latitude: z.number(),
         longitude: z.number()
@@ -47,6 +63,35 @@ export const RegisterDoctorSchema = z.object({
     }))
 });
 
+// Add schema for updating doctor details
+export const UpdateDoctorSchema = z.object({
+    name: z.string().nonempty().optional(),
+    email: z.string().nonempty().optional(),
+    age: z.number().int().positive().optional(),
+    hospital: z.string().nonempty().optional(),
+    experience: z.number().int().positive().optional(),
+    qualification: z.string().nonempty().optional(),
+    bio: z.string().nonempty().optional(),
+    profile_picture: z.string().nonempty().optional(),
+    locationwork: z.object({
+        latitude: z.number(),
+        longitude: z.number()
+    }).optional(),
+    available_days: z.array(z.string().nonempty()).optional(),
+    available_time: z.array(z.object({
+        start_time: z.string().nonempty(),
+        end_time: z.string().nonempty()
+    })).optional(),
+    specialties: z.array(z.string().nonempty()).optional()
+});
+
+// Rating schema
+export const RatingSchema = z.object({
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().optional(),
+    appointment_id: z.string().nonempty()
+});
+
 
 export const SignedUrlSchema = z.object({
     filename: z.string().nonempty(),
@@ -56,4 +101,35 @@ export const SignedUrlSchema = z.object({
     }, {
         message: "File type must be jpeg, jpg, or png"
     })
-})
+});
+
+// Ticket schema
+export const TicketSchema = z.object({
+    ticket_number: z.string().nonempty(),
+    appointment_id: z.string().nonempty(),
+    status: z.enum(["active", "resolved", "cancelled"]).default("active"),
+    notes: z.string().optional(),
+    qr_code: z.string().optional(),
+});
+
+// Create ticket schema (when creating a new ticket)
+export const CreateTicketSchema = z.object({
+    appointment_id: z.string().nonempty(),
+    notes: z.string().optional(),
+});
+
+// Update ticket schema
+export const UpdateTicketSchema = z.object({
+    status: z.enum(["active", "resolved", "cancelled"]).optional(),
+    notes: z.string().optional(),
+});
+
+// Create appointment with ticket schema 
+export const CreateAppointmentWithTicketSchema = z.object({
+    patient_id: z.string().nonempty(),
+    doctor_id: z.string().nonempty(),
+    date: z.string().nonempty(), // Will be parsed to DateTime
+    appointment_fee: z.number().positive(),
+    amount_paid: z.number().positive(),
+    ticket_notes: z.string().optional(),
+});
