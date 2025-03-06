@@ -17,14 +17,43 @@ doctorRouter.get("/specializations", async (_req: Request, res: Response) => {
     }
 });
 
+// get specializations by doctor id
+doctorRouter.get('/specializations/:id', async (req: Request, res: Response) => {
+    const { id } = req.body;
+
+    try {
+
+        const speciality = await prismaClient.doctorSpecialty.findMany({
+            where: {
+                doctor_id: id
+            },
+            include: {
+                specialty: true
+            }
+        });
+
+        res.status(200).json({
+            status: "success",
+            message: speciality
+        })
+
+
+    } catch (error) {
+        res.status(404).json({
+            status: "error",
+            message: "not found"
+        })
+    }
+
+})
+
 // register a new doctor
 doctorRouter.post("/doctor", async (req: Request, res: Response) => {
     const body = req.body;
 
-    console.log(body)
-
     const parsedData = RegisterDoctorSchema.safeParse(body);
     if (!parsedData.success) {
+        console.log(parsedData.error);
         res.status(400).json({
             status: "error",
             message: "Invalid data",
@@ -78,7 +107,8 @@ doctorRouter.post("/doctor", async (req: Request, res: Response) => {
                         start_time: time.start_time,
                         end_time: time.end_time
                     }))
-                }
+                },
+                consultancy_fees: parsedData.data.consultancy_fees
             },
             include: {
                 specialties: {
@@ -106,6 +136,7 @@ doctorRouter.post("/doctor", async (req: Request, res: Response) => {
 
 doctorRouter.get("/doctor", async (req: Request, res: Response) => {
     const auth = req.headers.authorization?.split(" ")[1];
+    console.log(auth)
     if (!auth) {
         res.status(401).json({
             status: "error",
@@ -117,11 +148,12 @@ doctorRouter.get("/doctor", async (req: Request, res: Response) => {
     try {
         const doctor = await prismaClient.doctor.findUnique({
             where: {
-                doctor_id: auth
+                wallet_address: auth
             },
             include: {
                 specialties: true,
-                available_time: true
+                available_time: true,
+                appointments: true
             }
         });
 
@@ -294,7 +326,8 @@ doctorRouter.get("/doctor/:id", async (req: Request, res: Response) => {
                     }
                 },
                 available_time: true,
-                ratings: true
+                ratings: true,
+                appointments: true
             }
         });
 
@@ -396,5 +429,43 @@ doctorRouter.get("/doctor/search", async (req: Request, res: Response) => {
 //     const { id } = req.params;
 //     console.log(id)
 // });
+
+// find doctors by ids
+doctorRouter.post("/doctors/bulk", async (req: Request, res: Response) => {
+    const body = req.body;
+    console.log(body)
+
+    try {
+        const doctors = await prismaClient.doctor.findMany({
+            where: {
+                doctor_id: {
+                    in: body.doctor_ids
+                }
+            },
+            include: {
+                specialties: {
+                    include: {
+                        specialty: true
+                    }
+                },
+                available_time: true
+            }
+        });
+
+        res.status(200).json({
+            status: "success",
+            data: doctors
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            status: "error",
+            message: "Failed to fetch doctors"
+        });
+    }
+});
+
+// get doctor specializations by id
+// doctorRouter.get("/")
 
 export default doctorRouter;

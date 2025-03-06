@@ -4,10 +4,10 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import axios from "axios";
 
-// Calculate expiration date (3 days from now)
-export const calculateExpiryDate = (): Date => {
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 3); // Add 3 days
+// Calculate expiration date (3 days from appointment date)
+export const calculateExpiryDate = (appointmentDate: Date): Date => {
+    const expiryDate = new Date(appointmentDate);
+    expiryDate.setDate(expiryDate.getDate() + 3); // Add 3 days from appointment date
     return expiryDate;
 };
 
@@ -143,6 +143,7 @@ export const checkAndUpdateExpiredTickets = async (): Promise<number> => {
     const now = new Date();
 
     try {
+        // Only update tickets whose appointments have passed and are still active
         const expiredTickets = await prismaClient.ticket.updateMany({
             where: {
                 expires_at: { lt: now },

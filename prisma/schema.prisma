@@ -27,6 +27,7 @@ model Patient {
   prescriptions   Prescription[]
   reports         Report[]
   ratings         Rating[]       // Add this line
+  chats           Chat[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -53,8 +54,12 @@ model Doctor {
   ratings         Rating[]
   average_rating  Float?
   specialties     DoctorSpecialty[]  // Add this line
+  consultancy_fees Float?
+  chats           Chat[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  ReportAccess ReportAccess[]
 }
 
 model Appointment {
@@ -75,7 +80,7 @@ model Appointment {
   rating            Rating?        // Add this line
   ticket            Ticket?        // Relation to the ticket
   createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  updatedAt         DateTime       @default(now())
 }
 
 model Prescription {
@@ -94,14 +99,23 @@ model Prescription {
 model Report {
   id             String      @id @default(cuid())
   patient_id     String
-  doctor_id      String
-  appointment_id String
+  appointment_id String?
   patient        Patient     @relation(fields: [patient_id], references: [id])
-  doctor         Doctor      @relation(fields: [doctor_id], references: [id])
-  appointment    Appointment @relation(fields: [appointment_id], references: [id])
-  report         String
+  appointment    Appointment? @relation(fields: [appointment_id], references: [id])
+  title          String      // Report title/name
+  description    String?     // Optional description of the report
+  file_url       String      // URL to the stored file
+  file_type      String      // File type (PDF, JPEG, etc.)
+  file_size      Int         // Size in bytes
+  report_type    String      // Type of report (Lab Report, X-Ray, MRI, etc.)
+  report_date    DateTime    // Date of the report
+  is_verified    Boolean     @default(false)  // Whether the report is verified by a doctor
   createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([patient_id])
+  ReportAccess ReportAccess[]
+  Doctor Doctor[]
 }
 
 model Rating {
@@ -169,8 +183,51 @@ model Ticket {
   qr_code         String?     // URL to QR code image
   expires_at      DateTime    // New field: when the ticket expires
   createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  updatedAt       DateTime    @default(now())
 
   @@index([ticket_number])
   @@index([appointment_id])
+}
+
+// Add Chat model
+model Chat {
+  id             String      @id @default(cuid())
+  patient_id     String
+  doctor_id      String
+  patient        Patient     @relation(fields: [patient_id], references: [id])
+  doctor         Doctor      @relation(fields: [doctor_id], references: [id])
+  messages       Message[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now())
+
+  @@index([patient_id])
+  @@index([doctor_id])
+}
+
+// Add Message model
+model Message {
+  id        String   @id @default(cuid())
+  chat_id   String
+  chat      Chat     @relation(fields: [chat_id], references: [id])
+  sender_id String
+  content   String
+  file_url  String?
+  file_type String?
+  sentAt    DateTime @default(now())
+
+  @@index([chat_id])
+}
+
+model ReportAccess {
+  id        String   @id @default(cuid())
+  report_id String
+  doctor_id String
+  report    Report   @relation(fields: [report_id], references: [id])
+  doctor    Doctor   @relation(fields: [doctor_id], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([report_id, doctor_id])
+  @@index([report_id])
+  @@index([doctor_id])
 }

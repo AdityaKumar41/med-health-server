@@ -26,6 +26,7 @@ export const DoctorSchema = z.object({
     available_days: z.array(z.string().nonempty()),
     specialties: z.array(z.string().nonempty()),
     average_rating: z.number().optional(),
+    consultancy_fees: z.number().positive(),
 });
 
 // update patient details schema
@@ -60,7 +61,8 @@ export const RegisterDoctorSchema = z.object({
     available_time: z.array(z.object({
         start_time: z.string().nonempty(),
         end_time: z.string().nonempty()
-    }))
+    })),
+    consultancy_fees: z.number().nonnegative()
 });
 
 // Add schema for updating doctor details
@@ -92,14 +94,20 @@ export const RatingSchema = z.object({
     appointment_id: z.string().nonempty()
 });
 
-
 export const SignedUrlSchema = z.object({
     filename: z.string().nonempty(),
     filetype: z.string().refine((val) => {
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        const allowedTypes = [
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
         return allowedTypes.includes(val);
     }, {
-        message: "File type must be jpeg, jpg, or png"
+        message: "File type must be jpeg, jpg, png, pdf, or word document"
     })
 });
 
@@ -110,6 +118,7 @@ export const TicketSchema = z.object({
     status: z.enum(["active", "resolved", "cancelled"]).default("active"),
     notes: z.string().optional(),
     qr_code: z.string().optional(),
+    expires_at: z.string().nonempty(), // New field: when the ticket expires
 });
 
 // Create ticket schema (when creating a new ticket)
@@ -132,4 +141,20 @@ export const CreateAppointmentWithTicketSchema = z.object({
     appointment_fee: z.number().positive(),
     amount_paid: z.number().positive(),
     ticket_notes: z.string().optional(),
+    tx_hash: z.string().nonempty()
 });
+
+export const ReportSchema = z.object({
+    patient_id: z.string(),
+    appointment_id: z.string().optional(),
+    title: z.string(),
+    description: z.string().optional(),
+    file_url: z.string(),
+    file_type: z.string(),
+    file_size: z.number(),
+    report_type: z.string(),
+    report_date: z.string(),
+    is_verified: z.boolean().optional()
+});
+
+export type Report = z.infer<typeof ReportSchema>;

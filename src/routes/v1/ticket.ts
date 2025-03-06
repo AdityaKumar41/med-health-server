@@ -1,7 +1,12 @@
 import { Router, Request, Response } from "express";
 import { prismaClient } from "../../client";
 import { CreateTicketSchema, UpdateTicketSchema } from "../../types";
-import { generateTicketNumber, generateQRCode, calculateExpiryDate, checkAndUpdateExpiredTickets } from "../../utils/ticket";
+import {
+    generateTicketNumber,
+    generateQRCode,
+    calculateExpiryDate,
+    checkAndUpdateExpiredTickets,
+} from "../../utils/ticket";
 
 const ticketRouter = Router();
 
@@ -44,23 +49,30 @@ ticketRouter.post("/", async (req: Request, res: Response) => {
             return;
         }
 
+        // Get appointment date for expiry calculation
+        const appointmentDate = appointment.date;
+
         // Generate unique ticket number
         const ticketNumber = await generateTicketNumber();
 
         // Generate QR code containing ticket information
-        const qrCodeUrl = await generateQRCode(ticketNumber, parsedData.data.appointment_id);
+        const qrCodeUrl = await generateQRCode(
+            ticketNumber,
+            parsedData.data.appointment_id
+        );
 
-        // Calculate expiry date (3 days from now)
-        const expiryDate = calculateExpiryDate();
+        // Calculate expiry date (3 days from appointment date, not creation date)
+        const expiryDate = calculateExpiryDate(appointmentDate);
 
-        // Create ticket
+        // Create ticket with initial status matching appointment
         const ticket = await prismaClient.ticket.create({
             data: {
                 ticket_number: ticketNumber,
                 appointment_id: parsedData.data.appointment_id,
                 notes: parsedData.data.notes,
                 qr_code: qrCodeUrl,
-                expires_at: expiryDate, // Set expiration date
+                status: appointment.status, // Match appointment status
+                expires_at: expiryDate,
             },
         });
 
@@ -208,83 +220,108 @@ ticketRouter.patch("/:ticketNumber", async (req: Request, res: Response) => {
 });
 
 // Check ticket validity
-ticketRouter.get("/validate/:ticketNumber", async (req: Request, res: Response) => {
-    const { ticketNumber } = req.params;
+ticketRouter.get(
+    "/validate/:ticketNumber",
+    async (req: Request, res: Response) => {
+        const { ticketNumber } = req.params;
 
-    try {
-        const ticket = await prismaClient.ticket.findUnique({
-            where: { ticket_number: ticketNumber },
-            include: {
-                appointment: {
-                    include: {
-                        doctor: true,
-                        patient: true,
+        try {
+            const ticket = await prismaClient.ticket.findUnique({
+                where: { ticket_number: ticketNumber },
+                include: {
+                    appointment: {
+                        include: {
+                            doctor: true,
+                            patient: true,
+                        },
                     },
                 },
-            },
-        });
-
-        if (!ticket) {
-            res.status(404).json({
-                status: "error",
-                message: "Ticket not found",
-            });
-            return;
-        }
-
-        // Check if ticket is expired
-        const now = new Date();
-        if (now > ticket.expires_at) {
-            // Update ticket status to cancelled if expired
-            await prismaClient.ticket.update({
-                where: { id: ticket.id },
-                data: { status: "cancelled" }
             });
 
-            res.status(400).json({
-                status: "error",
-                message: "Ticket has expired",
-                ticket: {
-                    ...ticket,
-                    status: "cancelled",
+            if (!ticket) {
+                res.status(404).json({
+                    status: "error",
+                    message: "Ticket not found",
+                });
+                return;
+            }
+
+            // Check if appointment date has passed and ticket is still pending
+            const now = new Date();
+            const appointmentDate = ticket.appointment.date;
+
+            // Check if ticket is expired (only if appointment date has passed)
+            if (appointmentDate < now && now > ticket.expires_at) {
+                // Update ticket status to cancelled if expired
+                await prismaClient.ticket.update({
+                    where: { id: ticket.id },
+                    data: { status: "cancelled" },
+                });
+
+                res.status(400).json({
+                    status: "error",
+                    message: "Ticket has expired",
+                    ticket: {
+                        ...ticket,
+                        status: "cancelled",
+                    },
+                });
+                return;
+            }
+
+            // Check if ticket status is not active
+            if (ticket.status !== "active" && ticket.status !== "scheduled") {
+                if (ticket.status === "pending") {
+                    res.status(202).json({
+                        status: "pending",
+                        message: "Ticket is pending doctor approval",
+                        ticket,
+                    });
+                    return;
+                }
+
+                res.status(400).json({
+                    status: "error",
+                    message: `Ticket is ${ticket.status}`,
+                    ticket,
+                });
+                return;
+            }
+
+            // Calculate remaining time (only if appointment date has passed)
+            let remainingHours = 0;
+            let remainingMinutes = 0;
+
+            if (appointmentDate < now) {
+                const remainingMs = ticket.expires_at.getTime() - now.getTime();
+                remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
+                remainingMinutes = Math.floor(
+                    (remainingMs % (1000 * 60 * 60)) / (1000 * 60)
+                );
+            }
+
+            res.status(200).json({
+                status: "success",
+                message: "Ticket is valid",
+                data: {
+                    ticket,
+                    validity: {
+                        expires_at: ticket.expires_at,
+                        appointment_date: appointmentDate,
+                        remaining_hours: remainingHours,
+                        remaining_minutes: remainingMinutes,
+                    },
                 },
             });
-        }
-
-        if (ticket.status !== "active") {
-            res.status(400).json({
+        } catch (error) {
+            console.error("Error validating ticket:", error);
+            res.status(500).json({
                 status: "error",
-                message: `Ticket is ${ticket.status}`,
-                ticket,
+                message: "Failed to validate ticket",
             });
-            return;
         }
-
-        // Calculate remaining time
-        const remainingMs = ticket.expires_at.getTime() - now.getTime();
-        const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
-        const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-
-        res.status(200).json({
-            status: "success",
-            message: "Ticket is valid",
-            data: {
-                ticket,
-                validity: {
-                    expires_at: ticket.expires_at,
-                    remaining_hours: remainingHours,
-                    remaining_minutes: remainingMinutes,
-                }
-            },
-        });
-    } catch (error) {
-        console.error("Error validating ticket:", error);
-        res.status(500).json({
-            status: "error",
-            message: "Failed to validate ticket",
-        });
     }
-});
+);
 
 // Admin endpoint to check and update all expired tickets
 ticketRouter.post("/check-expired", async (req: Request, res: Response) => {
