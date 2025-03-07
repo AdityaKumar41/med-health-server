@@ -74,60 +74,93 @@ appointmentRouter.post("/book", async (req: Request, res: Response) => {
     const appointmentDate = new Date(appointmentData.date);
 
     // Start a transaction to ensure both appointment and ticket are created
-    const result = await prismaClient.$transaction(async (prisma) => {
-      // Create appointment with full data validation
-      const appointment = await prisma.appointment.create({
-        data: {
-          patient: {
-            connect: { id: appointmentData.patient_id }, // Changed from id to wallet_address
-          },
-          doctor: {
-            connect: { id: appointmentData.doctor_id }, // Changed from id to doctor_id
-          },
-          date: appointmentDate,
-          appointment_fee: appointmentData.appointment_fee,
-          amount_paid: appointmentData.amount_paid,
-          tx_hash: appointmentData.tx_hash,
-          status: "pending", // Initial status is pending
-          is_active: true,
-        },
-        include: {
-          patient: true,
-          doctor: true,
-        },
-      });
-
-      // Generate ticket number
-      const ticketNumber = await generateTicketNumber();
-
-      // Generate QR code
-      const qrCodeUrl = await generateQRCode(ticketNumber, appointment.id);
-
-      // Calculate expiry date based on appointment date, not the booking date
-      const expiryDate = calculateExpiryDate(appointmentDate);
-
-      // Create ticket for the appointment
-      const ticket = await prisma.ticket.create({
-        data: {
-          ticket_number: ticketNumber,
-          appointment_id: appointment.id,
-          notes: ticket_notes,
-          qr_code: qrCodeUrl,
-          status: "pending", // Initial status is pending
-          expires_at: expiryDate,
-        },
-        include: {
-          appointment: {
+    const result = await prismaClient.$transaction(
+      async (prisma: {
+        appointment: {
+          create: (arg0: {
+            data: {
+              patient: { connect: { id: string } };
+              doctor: { connect: { id: string } };
+              date: Date;
+              appointment_fee: number;
+              amount_paid: number;
+              tx_hash: string;
+              status: string; // Initial status is pending
+              is_active: boolean;
+            };
+            include: { patient: boolean; doctor: boolean };
+          }) => any;
+        };
+        ticket: {
+          create: (arg0: {
+            data: {
+              ticket_number: string;
+              appointment_id: any;
+              notes: string | undefined;
+              qr_code: string;
+              status: string; // Initial status is pending
+              expires_at: Date;
+            };
             include: {
-              patient: true,
-              doctor: true,
+              appointment: { include: { patient: boolean; doctor: boolean } };
+            };
+          }) => any;
+        };
+      }) => {
+        // Create appointment with full data validation
+        const appointment = await prisma.appointment.create({
+          data: {
+            patient: {
+              connect: { id: appointmentData.patient_id }, // Changed from id to wallet_address
+            },
+            doctor: {
+              connect: { id: appointmentData.doctor_id }, // Changed from id to doctor_id
+            },
+            date: appointmentDate,
+            appointment_fee: appointmentData.appointment_fee,
+            amount_paid: appointmentData.amount_paid,
+            tx_hash: appointmentData.tx_hash,
+            status: "pending", // Initial status is pending
+            is_active: true,
+          },
+          include: {
+            patient: true,
+            doctor: true,
+          },
+        });
+
+        // Generate ticket number
+        const ticketNumber = await generateTicketNumber();
+
+        // Generate QR code
+        const qrCodeUrl = await generateQRCode(ticketNumber, appointment.id);
+
+        // Calculate expiry date based on appointment date, not the booking date
+        const expiryDate = calculateExpiryDate(appointmentDate);
+
+        // Create ticket for the appointment
+        const ticket = await prisma.ticket.create({
+          data: {
+            ticket_number: ticketNumber,
+            appointment_id: appointment.id,
+            notes: ticket_notes,
+            qr_code: qrCodeUrl,
+            status: "pending", // Initial status is pending
+            expires_at: expiryDate,
+          },
+          include: {
+            appointment: {
+              include: {
+                patient: true,
+                doctor: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      return { appointment, ticket };
-    });
+        return { appointment, ticket };
+      }
+    );
 
     console.log("Created appointment with ticket:", result);
 
@@ -170,30 +203,46 @@ appointmentRouter.patch(
 
     try {
       // Update both appointment and ticket status in a transaction
-      const result = await prismaClient.$transaction(async (prisma) => {
-        // Update appointment status
-        const appointment = await prisma.appointment.update({
-          where: { id: appointmentId },
-          data: { status },
-          include: { ticket: true },
-        });
+      const result = await prismaClient.$transaction(
+        async (prisma: {
+          appointment: {
+            update: (arg0: {
+              where: { id: string };
+              data: { status: any };
+              include: { ticket: boolean };
+            }) => any;
+          };
+          ticket: {
+            update: (arg0: {
+              where: { id: any };
+              data: { status: any };
+            }) => any;
+          };
+        }) => {
+          // Update appointment status
+          const appointment = await prisma.appointment.update({
+            where: { id: appointmentId },
+            data: { status },
+            include: { ticket: true },
+          });
 
-        // Also update the ticket status to match
-        if (appointment.ticket) {
-          let ticketStatus = status;
-          // If appointment is completed, ticket becomes used
-          if (status === "completed") {
-            ticketStatus = "used";
+          // Also update the ticket status to match
+          if (appointment.ticket) {
+            let ticketStatus = status;
+            // If appointment is completed, ticket becomes used
+            if (status === "completed") {
+              ticketStatus = "used";
+            }
+
+            await prisma.ticket.update({
+              where: { id: appointment.ticket.id },
+              data: { status: ticketStatus },
+            });
           }
 
-          await prisma.ticket.update({
-            where: { id: appointment.ticket.id },
-            data: { status: ticketStatus },
-          });
+          return appointment;
         }
-
-        return appointment;
-      });
+      );
 
       res.status(200).json({
         status: "success",

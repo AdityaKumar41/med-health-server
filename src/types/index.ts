@@ -34,8 +34,6 @@ export const UpdatePatientSchema = z.object({
     name: z.string().nonempty().optional(),
     email: z.string().nonempty().optional(),
     age: z.number().int().positive().optional(),
-    gender: z.string().nonempty().optional(),
-    blood_group: z.string().optional(),
     profile_picture: z.string().nonempty().optional()
 });
 
