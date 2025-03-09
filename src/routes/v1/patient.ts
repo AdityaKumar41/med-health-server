@@ -131,7 +131,7 @@ useRouter.post("/patients/bulk", async (req: Request, res: Response) => {
   try {
     const patients = await prismaClient.patient.findMany({
       where: {
-        wallet_address: {
+        id: {
           in: patientIds,
         },
       },

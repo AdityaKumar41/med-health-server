@@ -292,6 +292,9 @@ appointmentRouter.get("/appointments", async (req: Request, res: Response) => {
         },
         ticket: true,
       },
+      orderBy: {
+        date: "asc",
+      },
     });
 
     res.status(200).json({
@@ -350,6 +353,118 @@ appointmentRouter.get(
       res.status(500).json({
         status: "error",
         message: "Failed to fetch appointments",
+      });
+    }
+  }
+);
+
+// get doctor side pending or scheduled appointments
+appointmentRouter.get(
+  "/appointments/pending",
+  async (req: Request, res: Response) => {
+    const auth = req.headers.authorization?.split(" ")[1];
+    if (!auth) {
+      res.status(401).json({
+        status: "error",
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    try {
+      const doctor = await prismaClient.doctor.findUnique({
+        where: { wallet_address: auth },
+      });
+
+      if (!doctor) {
+        res.status(404).json({
+          status: "error",
+          message: "Doctor not found",
+        });
+        return;
+      }
+
+      const appointments = await prismaClient.appointment.findMany({
+        where: {
+          doctor_id: doctor.id,
+          status: {
+            in: ["pending", "scheduled"],
+          },
+        },
+        include: {
+          patient: true,
+          ticket: true,
+        },
+        orderBy: {
+          date: "asc",
+        },
+      });
+
+      res.status(200).json({
+        status: "success",
+        data: appointments,
+      });
+    } catch (error) {
+      console.error("Error fetching pending appointments:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to fetch pending appointments",
+      });
+    }
+  }
+);
+
+// for patient return pending or scheduled appointments
+appointmentRouter.get(
+  "/appointments/patient/pending",
+  async (req: Request, res: Response) => {
+    try {
+      const auth = req.headers.authorization?.split(" ")[1];
+      if (!auth) {
+        res.status(401).json({
+          status: "error",
+          message: "Unauthorized",
+        });
+        return;
+      }
+
+      const patient = await prismaClient.patient.findUnique({
+        where: { wallet_address: auth },
+      });
+
+      if (!patient) {
+        res.status(404).json({
+          status: "error",
+          message: "Patient not found",
+        });
+        return;
+      }
+
+      const appointments = await prismaClient.appointment.findMany({
+        where: {
+          patient_id: patient.id,
+          status: {
+            in: ["pending", "scheduled"],
+          },
+        },
+        include: {
+          doctor: true,
+          ticket: true,
+        },
+        orderBy: {
+          date: "asc",
+        },
+      });
+
+      res.status(200).json({
+        status: "success",
+        data: appointments,
+      });
+    } catch (error) {
+      console.error("Error fetching pending appointments:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to fetch pending appointments",
       });
     }
   }

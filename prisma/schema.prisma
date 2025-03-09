@@ -71,7 +71,7 @@ model Appointment {
   prescriptions     Prescription[]
   reports           Report[]
   date              DateTime
-  status            String         // pending, confirmed, cancelled, completed
+  status            String         // pending, scheduled, cancelled, completed
   appointment_fee   Float
   tx_hash           String?        // Transaction hash from the blockchain
   contract_appointment_id Int?     // Appointment ID from the smart contract
